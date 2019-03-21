@@ -7,6 +7,25 @@
 
 
 ; Replace with your application code
-start:
-    inc r16
-    rjmp start
+.include "m2560def.inc"
+.equ floor_number = 5
+	.dseg ; Set the starting address
+	.org 0x200
+	.cseg
+	rjmp start 
+start: 
+	ser r16
+	out DDRC, r16 ;set Port C for output
+	ldi r17, 1
+	ldi r16, 1
+leftshift:
+	cpi r17, floor_number
+		breq end
+	lsl r16
+	subi r16, -1
+	inc r17
+	rjmp leftshift
+end:
+	out PORTC, r16
+loop:
+	rjmp loop
