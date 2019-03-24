@@ -37,7 +37,7 @@ Direction:
 	jmp RESET
 .org OVF0addr
 	jmp OVF0address
-	rjmp start
+	rjmp start1
 RESET:
 	ldi r20, high(RAMEND)
 	out SPH, r20
@@ -46,36 +46,38 @@ RESET:
 
 	ser r16
 	out DDRC, r16 ;set Port C for output
-	out DDRG, r16 ;set Port G
+;	out DDRG, r16 ;set Port G for output
 
-	ldi r20, 0 ;setting up the timer
+	clear SecondCounter
+	clear TempCounter
+	ldi r20, 0b00000000 ;setting up the timer
 	out TCCR0A, r20
-	ldi r20, 2
+	ldi r20, 0b00000010
 	out TCCR0B, r20 ;set Prescaling value to 8
 	ldi r20, 1<<TOIE0 ;128 microseconds
 	sts TIMSK0, r20 ;T/C0 interrupt enable
 	sei ;enable the global interrupt
 
 	rjmp start
-OVF0address:
-	in r20, SREG
+OVF0address: ;timer0 overflow
+	in r20, SREG ;r20 is temp 
 	push r20
 	push YH
 	push YL
-	push r24
-	push r25
+	;push r24
+	;push r25
 
-	lds r24, TempCounter
+	lds r24, TempCounter ;load tempcounter into r25:r24
 	lds r25, TempCounter + 1
-	adiw r25:r24, 1
-	cpi r24, low(7812 * 2)
-	ldi r20, high(7812 * 2)
+	adiw r25:r24, 1 ;increase tempcounter by 1
+	cpi r24, low(3000) ;7812 * 2 
+	ldi r20, high(3000) ;compare tempcounter with 2 seconds
 	cpc r25, r20
-	brne NotSecond
+	brne NotSecond 
 	clear TempCounter
 
-	ldi YL, low(RAMEND - 2)
-	ldi YH, high(RAMEND - 2)
+	ldi YL, low(RAMEND - 2) ;prepare stack pointer for function call
+	ldi YH, high(RAMEND - 2) ;this function just updates the floor number and direction every 2 seconds
 	out SPL, YL
 	out SPH, YH
 
@@ -86,9 +88,9 @@ OVF0address:
 
 	rcall updateFloor
 	
-	std Y+1, r24
+	std Y+1, r24 ;store new floor number and direction in r24, r25
 	std Y+2, r25
-	sts FloorNumber, r24
+	sts FloorNumber, r24 ;pass r24 and r25 into floor number and direction in data memory
 	sts Direction, r25
 	rjmp endOVF0
 NotSecond:
@@ -114,13 +116,13 @@ endOVF0:
 
 	rcall start1
 
-	std Y+1, r24
-	std Y+2, r25
-	lds r24, FloorNumber
-	lds r25, Direction
+	;std Y+1, r24
+	;std Y+2, r25
+	;lds r24, FloorNumber
+	;lds r25, Direction
 
-	pop r25
-	pop r24
+	;pop r25
+	;pop r24
 	pop YL
 	pop YH
 	pop r20
@@ -168,7 +170,7 @@ updateFloor_end:
 	ret
 start:
 	lds r18, FloorNumber
-	ldi r18, 3
+	ldi r18, 1
 	sts FloorNumber, r18
 	lds r19, Direction
 	ldi r19, 1
@@ -195,6 +197,11 @@ start1:
 	lds r18, FloorNumber
 	lds r19, Direction
 
+	push r16
+	clr r16
+	out DDRG, r16
+	pop r16
+
 	cpi r18, 9
 		breq floor9
 		brge floor10
@@ -203,6 +210,8 @@ start1:
 	rjmp leftshift
 floor10:
 	push r18
+	ser r18
+	out DDRG, r18
 	ldi r18, 3
 	out PORTG, r18
 	pop r18
@@ -210,9 +219,12 @@ floor10:
 	rjmp leftshift
 floor9:
 	push r18
+	ser r18
+	out DDRG, r18
 	ldi r18, 1
 	out PORTG, r18
 	pop r18
+	rjmp leftshift
 floor1:
 	ldi r19, 1 ;start going up
 leftshift:
