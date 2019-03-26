@@ -35,27 +35,19 @@ Direction:
 .cseg
 .org 0x0000
 	jmp RESET
+	jmp DEFAULT
+	jmp DEFAULT
+
 .org OVF0addr
 	jmp OVF0address
+	jmp DEFAULT
+DEFAULT:
+	reti
 RESET:
 	ldi r20, high(RAMEND)
 	out SPH, r20
 	ldi r20, low(RAMEND)
 	out SPL, r20
-
-	ser r20
-	out DDRC, r20 ;set Port C for output
-
-	clear SecondCounter
-	clear TempCounter
-	ldi r20, 0b00000000 ;setting up the timer
-	out TCCR0A, r20
-	ldi r20, 0b00000010
-	out TCCR0B, r20 ;set Prescaling value to 8
-	ldi r20, 1<<TOIE0 ;128 microseconds
-	sts TIMSK0, r20 ;T/C0 interrupt enable
-	clr r20
-	sei ;enable the global interrupt
 
 	rjmp start
 OVF0address: ;timer0 overflow
@@ -63,8 +55,6 @@ OVF0address: ;timer0 overflow
 	push r20
 	push YH
 	push YL
-	;push r24
-	;push r25
 
 	lds r24, TempCounter ;load tempcounter into r25:r24
 	lds r25, TempCounter + 1
@@ -74,11 +64,6 @@ OVF0address: ;timer0 overflow
 	cpc r25, r20
 	brne NotSecond 
 	clear TempCounter
-
-	ldi YL, low(RAMEND - 2) ;prepare stack pointer for function call
-	ldi YH, high(RAMEND - 2) ;this function just updates the floor number and direction every 2 seconds
-	out SPL, YL
-	out SPH, YH
 
 	lds r24, FloorNumber ;loading Floor number and direction into the stack 
 	lds r25, Direction
@@ -99,11 +84,6 @@ NotSecond:
 	sts TempCounter + 1, r25
 	rjmp endOVF0
 endOVF0:
-	ldi YL, low(RAMEND - 2)
-	ldi YH, high(RAMEND - 2)
-	out SPL, YL
-	out SPH, YH
-
 	lds r24, FloorNumber
 	lds r25, Direction
 	std Y+1, r24
@@ -154,12 +134,26 @@ updateFloor_end:
 	pop YL
 	ret
 start:
-	cpi r23, 1
-		breq loop
-	ldi r23, 1
-	ldi r21, 5
+	ser r20
+	out DDRC, r20 ;set Port C for output
+
+	clear SecondCounter
+	clear TempCounter
+	clear FloorNumber
+	clear Direction
+	clr r23
+	ldi r20, 0b00000000 ;setting up the timer
+	out TCCR0A, r20
+	ldi r20, 0b00000010
+	out TCCR0B, r20 ;set Prescaling value to 8
+	ldi r20, 1<<TOIE0 ;128 microseconds
+	sts TIMSK0, r20 ;T/C0 interrupt enable
+	clr r20
+	sei ;enable the global interrupt
+
+	ldi r21, 2 ;SET STARTING FLOOR
 	sts FloorNumber, r21
-	ldi r22, 0
+	ldi r22, 0 ;SET STARTING DIRECTION
 	sts Direction, r22
 	rjmp loop
 start1:
