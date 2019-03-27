@@ -80,14 +80,14 @@ OVF0address: ;timer0 overflow
 	cpc r25, r20
 		brlo NotSecond 
 
+	clear TempCounter
+
 	lds r24, FloorNumber ;loading Floor number and direction into the stack 
 	lds r25, Direction
 	cp r24, r21 ;compare current floor with floor in the request
 		breq FiveSecondPause
 	std Y+1, r24
 	std Y+2, r25
-
-	clear TempCounter
 
 	rcall updateFloor ;function to update the floor number and direction
 	
@@ -99,35 +99,42 @@ OVF0address: ;timer0 overflow
 	sts Direction, r25
 	rjmp endOVF0
 NotSecond:
-	sts TempCounter, r24
+	sts TempCounter, r24 ;store TempCounter back into data memory
 	sts TempCounter + 1, r25
 	rjmp endOVF0
 FiveSecondPause:
-	lds r24, TempCounter ;load tempcounter into r25:r24
-	lds r25, TempCounter + 1
-	adiw r25:r24, 1 ;increase tempcounter by 1
-	cpi r24, low(1000)
-	ldi r20, high(1000)
-	cpc r25, r20
-		breq Flash
-	cpi r24, low(7000) ;7812 * 2 + 7812 * 5
-	ldi r20, high(7000) ;compare tempcounter with 7 seconds
-	cpc r25, r20
-		brlo NotSecond
-	rjmp FiveSecondEnd
+	lds r24, FiveSecondCounter ;Delay for 5 seconds
+	cpi r24, 5
+		breq FiveSecondEnd
+	inc r24
+	sts FiveSecondCounter, r24
+	
+	;lds r24, TempCounter ;load tempcounter into r25:r24
+	;lds r25, TempCounter + 1
+	;adiw r25:r24, 1 ;increase tempcounter by 1
+	;cpi r24, low(1000)
+	;ldi r20, high(1000)
+	;cpc r25, r20
+	;	breq Flash
+	;cpi r24, low(7000) ;7812 * 2 + 7812 * 5
+	;ldi r20, high(7000) ;compare tempcounter with 7 seconds
+	;cpc r25, r20
+	;	brlo NotSecond
+	;rjmp FiveSecondEnd
 	;vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv NOT YET FINISHED
 Flash:
 	lds r24, Flashing
 	clr r20
 	out PORTC, r20
-	rjmp 
+;	rjmp 
 	;^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 FiveSecondEnd:
 	ld r21, X+
+	clear FiveSecondCounter
 	clear TempCounter
 	rjmp endOVF0
 endOVF0:
-	lds r24, FloorNumber
+	lds r24, FloorNumber ;end of interrupt
 	lds r25, Direction
 	std Y+1, r24
 	std Y+2, r25
@@ -139,7 +146,7 @@ endOVF0:
 	pop r20
 	out SREG, r20
 	reti
-updateFloor:
+updateFloor: ;updates the floor number and direction
 	push YL
 	push YH
 	in YL, SPL
@@ -465,4 +472,3 @@ end:
 	ret
 loop:
 	rjmp loop
-
