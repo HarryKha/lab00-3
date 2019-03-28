@@ -507,10 +507,10 @@ EXT_INT1:
 	in r20, SREG ; save SREG
 	lds r24, FloorNumber
 	clr r25 ;set up delay, 255 cycles can make it longer by using 2 bits
-DEBOUNCE:
+DEBOUNCE_BUTTON:
 	inc r25
 	cpi r25, 255
-	brlo DEBOUNCE
+	brlo DEBOUNCE_BUTTON
 	in r25, PINB ;get pin state
 	cpi r25, 4 ;if pin is pressed down (ie 1 then rising edge)
 	breq PRESS_DOWN
