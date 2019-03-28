@@ -49,23 +49,20 @@ FloorNumber:
 	.byte 1
 Direction:
 	.byte 1
-Debounce:
-	.byte 1
 
 .cseg
 .org 0x0000
 	jmp RESET
-
-.org INT0addr
-	jmp EXT_INT0
-.org INT1addr
-	jmp EXT_INT1
-.org OVF0addr
-	jmp OVF0address
-
+	jmp DEFAULT
+	jmp DEFAULT
 	number: .db 4,9,3,10,9,6,2,8
 	insertflo: .db 7,5,2,8
 
+.org OVF0addr
+	jmp OVF0address
+	jmp DEFAULT
+DEFAULT:
+	reti
 RESET:
 	ldi r20, high(RAMEND)
 	out SPH, r20
@@ -387,19 +384,11 @@ start:
 	ser r20
 	out DDRC, r20 ;set Port C for output
 
-	ldi r20, (2 << ISC00) ; set INT0 as fallingsts EICRA, r20 ; edge triggered interrupt
-	in r20, EIMSK ; enable INT0
-	ori r20, (1<<INT0)
-	out EIMSK, r20
-	ori r20, (1<<INT1)
-	out EIMSK, r20
-
 	clear Flashing
 	clear FiveSecondCounter
 	clear TempCounter
 	clear FloorNumber
 	clear Direction
-	clear Debounce
 	clr r23
 	ldi r20, 0b00000000 ;setting up the timer
 	out TCCR0A, r20
@@ -480,34 +469,3 @@ end:
 	ret
 loop:
 	rjmp loop
-EXT_INT0:
-	push r20 ; save register
-	in r20, SREG ; save SREG
-	lds r24, FloorNumber
-	cp r24, r21 ;r21 is floor numbers in the array
-		breq CloseDoor
-	out SREG, r20
-	pop r20 ; restore register
-	reti
-EXT_INT1:
-	push r20 ; save register
-	in r20, SREG ; save SREG
-	lds r24, FloorNumber
-	cp r24, r21 ;r21 is floor numbers in the array
-		breq HoldDoor
-	out SREG, r20
-	pop r20 ; restore register
-	reti
-CloseDoor:
-	ldi r24, 2
-	sts FiveSecondCounter, r24
-	out SREG, r20
-	pop r20 ; restore register
-	reti
-HoldDoor:
-	lds r24, FiveSecondCounter
-	subi r24, 1
-	sts FiveSecondCounter, r24
-	out SREG, r20
-	pop r20
-	reti

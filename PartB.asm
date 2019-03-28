@@ -59,8 +59,8 @@ OVF0address: ;timer0 overflow
 	lds r24, TempCounter ;load tempcounter into r25:r24
 	lds r25, TempCounter + 1
 	adiw r25:r24, 1 ;increase tempcounter by 1
-	cpi r24, low(1000) ;7812 * 2 
-	ldi r20, high(1000) ;compare tempcounter with 2 seconds
+	cpi r24, low(7812 * 2) ;7812 * 2 
+	ldi r20, high(7812 * 2) ;compare tempcounter with 2 seconds
 	cpc r25, r20
 	brne NotSecond 
 	clear TempCounter
