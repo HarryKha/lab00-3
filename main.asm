@@ -19,11 +19,15 @@
 .endmacro
 
 .macro clear
+	push YH
+	push YL
 	ldi YL, low(@0)
 	ldi YH, high(@0)
 	clr r20
 	st Y+, r20
 	st Y, r20
+	pop YL
+	pop YH
 .endmacro
 
 .def arraysize = r17
@@ -75,15 +79,17 @@ OVF0address: ;timer0 overflow
 	lds r24, TempCounter ;load tempcounter into r25:r24
 	lds r25, TempCounter + 1
 	adiw r25:r24, 1 ;increase tempcounter by 1
-	cpi r24, low(2000) ;7812 * 2 
-	ldi r20, high(2000) ;compare tempcounter with 2 seconds
+	cpi r24, low(7812) ;7812 * 2 
+	ldi r20, high(7812) ;compare tempcounter with 2 seconds
 	cpc r25, r20
-		brlo NotSecond 
+		brne NotSecond 
 
 	clear TempCounter
 
 	lds r24, FloorNumber ;loading Floor number and direction into the stack 
 	lds r25, Direction
+	cpi r24, 0
+		breq TurnOn
 	cp r24, r21 ;compare current floor with floor in the request
 		breq FiveSecondPause
 	std Y+1, r24
@@ -104,34 +110,22 @@ NotSecond:
 	rjmp endOVF0
 FiveSecondPause:
 	lds r24, FiveSecondCounter ;Delay for 5 seconds
-	cpi r24, 5
+	cpi r24, 2
 		breq FiveSecondEnd
 	inc r24
 	sts FiveSecondCounter, r24
-	
-	;lds r24, TempCounter ;load tempcounter into r25:r24
-	;lds r25, TempCounter + 1
-	;adiw r25:r24, 1 ;increase tempcounter by 1
-	;cpi r24, low(1000)
-	;ldi r20, high(1000)
-	;cpc r25, r20
-	;	breq Flash
-	;cpi r24, low(7000) ;7812 * 2 + 7812 * 5
-	;ldi r20, high(7000) ;compare tempcounter with 7 seconds
-	;cpc r25, r20
-	;	brlo NotSecond
-	;rjmp FiveSecondEnd
-	;vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv NOT YET FINISHED
-Flash:
+	lds r24, FloorNumber
+	sts Flashing, r24 ;Flashing is a temporary value that holds the floor number
+	clr r24
+	sts FloorNumber, r24
+	rjmp endOVF0
+TurnOn:
 	lds r24, Flashing
-	clr r20
-	out PORTC, r20
-;	rjmp 
-	;^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+	sts FloorNumber, r24
+	rjmp endOVF0	
 FiveSecondEnd:
 	ld r21, X+
 	clear FiveSecondCounter
-	clear TempCounter
 	rjmp endOVF0
 endOVF0:
 	lds r24, FloorNumber ;end of interrupt
@@ -184,7 +178,6 @@ updateFloor_end:
 	pop YL
 	ret
 main:
-
 	ldi zl, low(number<<1)
 	ldi zh, high(number<<1)
 	ldi yl, low(vartab)
@@ -437,7 +430,12 @@ start1:
 	cpi r16, 9
 		breq floor9
 		brge floor10
+	cpi r16, 0
+		breq turnOff
 	rjmp leftshift
+turnOff:
+	mov r18, r16
+	rjmp end
 floor10:
 	push r18
 	ser r18
@@ -462,7 +460,6 @@ leftshift:
 	inc r19
 	rjmp leftshift
 end:
-	sts Flashing, r18
 	out PORTC, r18
 	adiw Y, 2
 	out SPH, YH
