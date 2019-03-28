@@ -484,6 +484,8 @@ EXT_INT0:
 	push r20 ; save register
 	in r20, SREG ; save SREG
 	lds r24, FloorNumber
+	cpi r24, 0
+		breq CloseDoor
 	cp r24, r21 ;r21 is floor numbers in the array
 		breq CloseDoor
 	out SREG, r20
@@ -493,6 +495,8 @@ EXT_INT1:
 	push r20 ; save register
 	in r20, SREG ; save SREG
 	lds r24, FloorNumber
+	cpi r24, 0
+		breq HoldDoor
 	cp r24, r21 ;r21 is floor numbers in the array
 		breq HoldDoor
 	out SREG, r20
