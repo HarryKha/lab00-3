@@ -45,6 +45,8 @@ FiveSecondCounter:
 	.byte 1
 TempCounter:
 	.byte 2
+SecondCounter:
+	.byte 2
 FloorNumber:
 	.byte 1
 Direction:
@@ -63,8 +65,8 @@ Debounce:
 .org OVF0addr
 	jmp OVF0address
 
-	number: .db 4,9,3,10,9,6,2,8
-	insertflo: .db 7,5,2,8
+	number: .db 4,2,6,8,10,6,2,8,0,0
+	insertflo: .db 0,0
 
 RESET:
 	ldi r20, high(RAMEND)
@@ -82,8 +84,8 @@ OVF0address: ;timer0 overflow
 	lds r24, TempCounter ;load tempcounter into r25:r24
 	lds r25, TempCounter + 1
 	adiw r25:r24, 1 ;increase tempcounter by 1
-	cpi r24, low(7812) ;7812 * 2 
-	ldi r20, high(7812) ;compare tempcounter with 2 seconds
+	cpi r24, low(7812/2) ;7812 * 2 
+	ldi r20, high(7812/2) ;compare tempcounter with 2 seconds
 	cpc r25, r20
 		brne NotSecond 
 
@@ -93,8 +95,22 @@ OVF0address: ;timer0 overflow
 	lds r25, Direction
 	cpi r24, 0
 		breq TurnOn
+
 	cp r24, r21 ;compare current floor with floor in the request
 		breq FiveSecondPause
+
+	lds r24, SecondCounter
+	lds r25, SecondCounter + 1
+	adiw r25:r24, 1
+	cpi r24, low(2)
+	ldi r20, high(2)
+	cpc r25, r20
+		brne NotSecond2
+
+	clear SecondCounter
+
+	lds r24, FloorNumber ;loading Floor number and direction into the stack 
+	lds r25, Direction
 	std Y+1, r24
 	std Y+2, r25
 
@@ -111,13 +127,17 @@ NotSecond:
 	sts TempCounter, r24 ;store TempCounter back into data memory
 	sts TempCounter + 1, r25
 	rjmp endOVF0
+NotSecond2:
+	sts SecondCounter, r24
+	sts SecondCounter + 1, r25
+	rjmp endOVF0
 FiveSecondPause:
 	lds r24, FiveSecondCounter ;Delay for 5 seconds
-	cpi r24, 2
+	cpi r24, 5
 		breq FiveSecondEnd
 	inc r24
 	sts FiveSecondCounter, r24
-	lds r24, FloorNumber
+	lds r24, FloorNumber ;turning off LEDs
 	sts Flashing, r24 ;Flashing is a temporary value that holds the floor number
 	clr r24
 	sts FloorNumber, r24
@@ -181,31 +201,23 @@ updateFloor_end:
 	pop YL
 	ret
 main:
+	;set up parameters
+	clr arraysize
 	ldi zl, low(number<<1)
 	ldi zh, high(number<<1)
-	ldi yl, low(vartab)
-	ldi yh, high(vartab)
-	;insert array into data memory
-	insertprog z+
-	insertprog z+
-	insertprog z+
-	insertprog z+
-	insertprog z+
-	insertprog z+
-	insertprog z+
-	insertprog z+
-	ldi arraysize, 6
-	ldi curflor, 8
-	ldi updwn, 1 ;0 is down, 1 is up
-
-	ldi zl,low(insertflo<<1)
-	ldi zh,high(insertflo<<1)
 	ldi yl, low(RAMEND-4) ;4bytes to store local variables
 	ldi yh, high(RAMEND-4) ;assume variable is 1 byte
 	out SPH, yh ;adjust stack pointer to poin to new stack top
 	out SPL, yl
-	;*******************************************************************
-	lpm insert, z+ ; floor to be inserted = 13
+
+	ldi curflor, 8
+	ldi updwn, 0 ;0 is down, 1 is up
+	;insert array into data memory
+	proginsert:
+	lpm insert, z+ ; gets floor to be in array
+	cpi insert, 0 ;compares the insert number to 0 and if zero, end of array
+	breq begin
+
 	std y+1, insert ;store initial parameters
 	std y+2, arraysize
 	std y+3, curflor
@@ -219,39 +231,18 @@ main:
 
 	rcall insert_request ; call subroutine
 	mov arraysize, r21 ;move returned number back to r17
-	;*******************************************************************
-	lpm insert, z+ ; floor to be inserted = 4
-	std y+1, insert ;store initial parameters
-	std y+2, arraysize
-	std y+3, curflor
-	std y+4, updwn
-
-	;prepare parameters for function call
-	ldd r21, y+1 ; r21 holds the insert number parameter
-	ldd r22, y+2 ; r22 holds arraysize parameter
-	ldd r23, y+3 ; r23 holds current floor parameter
-	ldd r24, y+4 ; r24 holds lift direction parameter
-
-	rcall insert_request ; call subroutine
-	mov arraysize, r21 ;move returned number back to r17
-	;*******************************************************************
-	lpm insert, z+ ; floor to be inserted = 17
-	std y+1, insert ;store initial parameters
-	std y+2, arraysize
-	std y+3, curflor
-	std y+4, updwn
-
-	;prepare parameters for function call
-	ldd r21, y+1 ; r21 holds the insert number parameter
-	ldd r22, y+2 ; r22 holds arraysize parameter
-	ldd r23, y+3 ; r23 holds current floor parameter
-	ldd r24, y+4 ; r24 holds lift direction parameter
-
-	rcall insert_request ; call subroutine
-	mov arraysize, r21 ;move returned number back to r17
-	;*******************************************************************
 	
-	lpm insert, z+ ; floor to be inserted = 8
+	jmp proginsert
+	;*******************************************************************
+	begin:
+
+	ldi zl,low(insertflo<<1) ;move z pointer to the inserted floors
+	ldi zh,high(insertflo<<1)
+	repeat: ;keeps repeating until it hits zero
+	;*******************************************************************
+	lpm insert, z+ ; floor to be inserted
+	cpi insert, 0
+		breq start2
 	std y+1, insert ;store initial parameters
 	std y+2, arraysize
 	std y+3, curflor
@@ -265,8 +256,9 @@ main:
 
 	rcall insert_request ; call subroutine
 	mov arraysize, r21 ;move returned number back to r17
+	jmp repeat
 	;*******************************************************************
-	rjmp start  ;end of main function
+	rjmp start2  ;end of main function
 
 insert_request:
 	;prologue
@@ -297,11 +289,13 @@ insert_request:
 	ldd r19, y+1 ;load inserted number
 	ldd r16, y+3 ;load current floor
 	ldd r18, y+4 ;load lift movement
-
-	;insert number into data mem in order
-	clr r15 ;used for array counter
 	ldi zl, low(vartab)
 	ldi zh, high(vartab)
+	cpi r20, 0 ;checks if array is empty
+	breq firstno
+	;insert number into data mem in order
+	clr r15 ;used for array counter
+	
 
 	cp r16, r19 ;compare current floor to insert floor
 	breq exist ;inserted floor is the current floor
@@ -312,6 +306,9 @@ insert_request:
 	cpi r18, 0 ;check lift movement
 	breq dwn
 	ldi r16, 255
+start2:
+	rjmp start
+
 	dwn:
 	ld r17, z+ ;load current array element
 	cp r19, r17 ;compare the insert number to current array element
@@ -364,6 +361,13 @@ insert_request:
 	
 	fin:
 	inc r20
+	jmp exist
+	
+	firstno:
+	cp r19, r16
+	breq exist
+	st z, r19
+	inc r20
 	
 	exist:
 	mov r21, r20 ;move arraysize to r21
@@ -397,6 +401,7 @@ start:
 	clear Flashing
 	clear FiveSecondCounter
 	clear TempCounter
+	clear SecondCounter
 	clear FloorNumber
 	clear Direction
 	clear Debounce
@@ -484,6 +489,12 @@ EXT_INT0:
 	push r20 ; save register
 	in r20, SREG ; save SREG
 	lds r24, FloorNumber
+	lds r25, Debounce
+	inc r25
+	cpi r25, 1
+		brlo doNothing
+	clr r25
+	sts Debounce, r25
 	cpi r24, 0
 		breq CloseDoor
 	cp r24, r21 ;r21 is floor numbers in the array
@@ -495,6 +506,12 @@ EXT_INT1:
 	push r20 ; save register
 	in r20, SREG ; save SREG
 	lds r24, FloorNumber
+	lds r25, Debounce
+	inc r25
+	cpi r25, 1
+		brlo doNothing
+	clr r25
+	sts Debounce, r25
 	cpi r24, 0
 		breq HoldDoor
 	cp r24, r21 ;r21 is floor numbers in the array
@@ -502,15 +519,19 @@ EXT_INT1:
 	out SREG, r20
 	pop r20 ; restore register
 	reti
+doNothing:
+	out SREG, r20
+	pop r20 ; restore register
+	reti
 CloseDoor:
-	ldi r24, 2
+	ldi r24, 5
 	sts FiveSecondCounter, r24
 	out SREG, r20
 	pop r20 ; restore register
 	reti
 HoldDoor:
 	lds r24, FiveSecondCounter
-	subi r24, 1
+	subi r24, 3
 	sts FiveSecondCounter, r24
 	out SREG, r20
 	pop r20

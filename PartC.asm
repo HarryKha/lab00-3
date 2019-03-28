@@ -55,8 +55,8 @@ Direction:
 	jmp RESET
 	jmp DEFAULT
 	jmp DEFAULT
-	number: .db 4,9,3,10,9,6,2,8
-	insertflo: .db 7,5,2,8
+	number: .db 4,9,3,10,9,6,2,8,0
+	insertflo: .db 7,5,2,8,0
 
 .org OVF0addr
 	jmp OVF0address
@@ -178,31 +178,23 @@ updateFloor_end:
 	pop YL
 	ret
 main:
+	;set up parameters
+	clr arraysize
 	ldi zl, low(number<<1)
 	ldi zh, high(number<<1)
-	ldi yl, low(vartab)
-	ldi yh, high(vartab)
-	;insert array into data memory
-	insertprog z+
-	insertprog z+
-	insertprog z+
-	insertprog z+
-	insertprog z+
-	insertprog z+
-	insertprog z+
-	insertprog z+
-	ldi arraysize, 6
-	ldi curflor, 8
-	ldi updwn, 1 ;0 is down, 1 is up
-
-	ldi zl,low(insertflo<<1)
-	ldi zh,high(insertflo<<1)
 	ldi yl, low(RAMEND-4) ;4bytes to store local variables
 	ldi yh, high(RAMEND-4) ;assume variable is 1 byte
 	out SPH, yh ;adjust stack pointer to poin to new stack top
 	out SPL, yl
-	;*******************************************************************
-	lpm insert, z+ ; floor to be inserted = 13
+
+	ldi curflor, 8
+	ldi updwn, 0 ;0 is down, 1 is up
+	;insert array into data memory
+	proginsert:
+	lpm insert, z+ ; gets floor to be in array
+	cpi insert, 0 ;compares the insert number to 0 and if zero, end of array
+	breq begin
+
 	std y+1, insert ;store initial parameters
 	std y+2, arraysize
 	std y+3, curflor
@@ -216,39 +208,18 @@ main:
 
 	rcall insert_request ; call subroutine
 	mov arraysize, r21 ;move returned number back to r17
-	;*******************************************************************
-	lpm insert, z+ ; floor to be inserted = 4
-	std y+1, insert ;store initial parameters
-	std y+2, arraysize
-	std y+3, curflor
-	std y+4, updwn
-
-	;prepare parameters for function call
-	ldd r21, y+1 ; r21 holds the insert number parameter
-	ldd r22, y+2 ; r22 holds arraysize parameter
-	ldd r23, y+3 ; r23 holds current floor parameter
-	ldd r24, y+4 ; r24 holds lift direction parameter
-
-	rcall insert_request ; call subroutine
-	mov arraysize, r21 ;move returned number back to r17
-	;*******************************************************************
-	lpm insert, z+ ; floor to be inserted = 17
-	std y+1, insert ;store initial parameters
-	std y+2, arraysize
-	std y+3, curflor
-	std y+4, updwn
-
-	;prepare parameters for function call
-	ldd r21, y+1 ; r21 holds the insert number parameter
-	ldd r22, y+2 ; r22 holds arraysize parameter
-	ldd r23, y+3 ; r23 holds current floor parameter
-	ldd r24, y+4 ; r24 holds lift direction parameter
-
-	rcall insert_request ; call subroutine
-	mov arraysize, r21 ;move returned number back to r17
-	;*******************************************************************
 	
-	lpm insert, z+ ; floor to be inserted = 8
+	jmp proginsert
+	;*******************************************************************
+	begin:
+
+	ldi zl,low(insertflo<<1) ;move z pointer to the inserted floors
+	ldi zh,high(insertflo<<1)
+	repeat: ;keeps repeating until it hits zero
+	;*******************************************************************
+	lpm insert, z+ ; floor to be inserted
+	cpi insert, 0
+		breq start2
 	std y+1, insert ;store initial parameters
 	std y+2, arraysize
 	std y+3, curflor
@@ -262,8 +233,9 @@ main:
 
 	rcall insert_request ; call subroutine
 	mov arraysize, r21 ;move returned number back to r17
+	jmp repeat
 	;*******************************************************************
-	rjmp start  ;end of main function
+	rjmp start2  ;end of main function
 
 insert_request:
 	;prologue
@@ -294,11 +266,13 @@ insert_request:
 	ldd r19, y+1 ;load inserted number
 	ldd r16, y+3 ;load current floor
 	ldd r18, y+4 ;load lift movement
-
-	;insert number into data mem in order
-	clr r15 ;used for array counter
 	ldi zl, low(vartab)
 	ldi zh, high(vartab)
+	cpi r20, 0 ;checks if array is empty
+	breq firstno
+	;insert number into data mem in order
+	clr r15 ;used for array counter
+	
 
 	cp r16, r19 ;compare current floor to insert floor
 	breq exist ;inserted floor is the current floor
@@ -309,6 +283,9 @@ insert_request:
 	cpi r18, 0 ;check lift movement
 	breq dwn
 	ldi r16, 255
+start2:
+	rjmp start
+
 	dwn:
 	ld r17, z+ ;load current array element
 	cp r19, r17 ;compare the insert number to current array element
@@ -360,6 +337,13 @@ insert_request:
 	st -z, r19
 	
 	fin:
+	inc r20
+	jmp exist
+	
+	firstno:
+	cp r19, r16
+	breq exist
+	st z, r19
 	inc r20
 	
 	exist:

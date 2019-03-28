@@ -8,7 +8,7 @@
 
 ; Replace with your application code
 .include "m2560def.inc"
-.equ floor_number = 9
+.equ floor_number = 5
 	.dseg ; Set the starting address
 	.org 0x200
 	.cseg
