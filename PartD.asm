@@ -507,25 +507,50 @@ EXT_INT1:
 	in r20, SREG ; save SREG
 	lds r24, FloorNumber
 	clr r25 ;set up delay, 255 cycles can make it longer by using 2 bits
+	push r23
+	push r22
+	clr r22
+	ldi r23, 177
 DEBOUNCE_BUTTON:
-	inc r25
-	cpi r25, 255
-	brlo DEBOUNCE_BUTTON
+	cpi r23, 255 ;pressed down
+	breq doNothing
+	cpi r23, 0; let go
+	breq LET_GO
+	nop
 	in r25, PINB ;get pin state
+	nop
 	cpi r25, 4 ;if pin is pressed down (ie 1 then rising edge)
 	breq PRESS_DOWN
+	nop
+	jmp NPRESS_DOWN
+LET_GO:
+	pop r22
+	pop r23
 	cpi r24, 0
 		breq HoldDoor
 	cp r24, r21 ;r21 is floor numbers in the array
 		breq HoldDoor
-PRESS_DOWN:
-	out SREG, r20
-	pop r20 ; restore register
-	reti
+	
 doNothing:
 	out SREG, r20
+	pop r22
+	pop r23
 	pop r20 ; restore register
 	reti
+PRESS_DOWN:
+	push r21
+	clr r21
+	inc r22
+	adc r23, r21
+	pop r21
+	jmp DEBOUNCE_BUTTON
+NPRESS_DOWN:
+	nop
+	dec r22
+	nop
+	sbci r23, 0
+	jmp DEBOUNCE_BUTTON
+
 CloseDoor:
 	ldi r24, 5
 	sts FiveSecondCounter, r24
